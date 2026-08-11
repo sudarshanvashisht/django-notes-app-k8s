@@ -1,66 +1,60 @@
-# Django Notes App — Production-Grade DevSecOps on Kubernetes
+# 🚀 Production-Grade Django & React Notes App: DevOps & GitOps Lifecycle
 
-> A full-stack Django REST API + React notes application, containerized with Docker, orchestrated on Kubernetes, and deployed through a fully automated Jenkins CI/CD pipeline with security hardening, self-healing infrastructure, and GitOps-style deployments.
+This repository contains a full-stack Notes Application designed, containerized, and configured for a complete **DevOps & GitOps lifecycle**. The project showcases secure containerization, automated testing, transient smoke tests, local cluster orchestration with **Kubernetes (Kind)**, and an automated continuous integration and continuous deployment (CI/CD) engine powered by **Jenkins**.
 
 ---
 
-## 🏗️ Architecture Overview
+## 📐 System & Deployment Architecture
 
+This project implements a classic 3-tier architecture decoupled for high availability, security, and independent scaling.
+
+### 1. Local Development Stack (Docker Compose)
+In the development environment, Nginx acts as a reverse proxy serving the React frontend static build and routing API calls to Gunicorn/Django, which connects to a dedicated MySQL instance.
+
+```mermaid
+graph TD
+    Client([User Browser]) -->|Port 80| Nginx[Nginx Reverse Proxy]
+    Nginx -->|Serves Static Assets| ReactFS[React Build static files]
+    Nginx -->|Proxies /api/*| Gunicorn[Gunicorn / Django API]
+    Gunicorn -->|Relational Database Queries| MySQL[(MySQL 8.0 Database)]
+    MySQL -->|Volume Mount| LocalDBVolume[(Docker Volume: mysql_data)]
 ```
-                          ┌──────────────────────────────┐
-                          │       GitHub Repository       │
-                          │   (Source Code + K8s Manifests)│
-                          └──────────────┬───────────────┘
-                                         │  Webhook / Poll
-                                         ▼
-                          ┌──────────────────────────────┐
-                          │     Jenkins CI/CD Pipeline     │
-                          │  ┌──────────────────────────┐ │
-                          │  │ 1. Clone Code            │ │
-                          │  │ 2. Build Docker Image    │ │
-                          │  │ 3. Run Unit Tests        │ │
-                          │  │ 4. Compose Smoke Test    │ │
-                          │  │ 5. Push to Docker Hub    │ │
-                          │  │ 6. Deploy to Kubernetes  │ │
-                          │  └──────────────────────────┘ │
-                          └──────────────┬───────────────┘
-                                         │
-                    ┌────────────────────┼────────────────────┐
-                    ▼                    ▼                    ▼
-           ┌──────────────┐   ┌──────────────────┐   ┌──────────────┐
-           │  Docker Hub   │   │ Kind K8s Cluster  │   │ Compose Test │
-           │  Registry     │   │  (Production)     │   │  (Staging)   │
-           └──────────────┘   └────────┬─────────┘   └──────────────┘
-                                       │
-                              ┌────────┴────────┐
-                              ▼                 ▼
-                     ┌──────────────┐  ┌──────────────┐
-                     │  Django Pods  │  │  MySQL Pod    │
-                     │  (2 Replicas) │  │  (Persistent) │
-                     └──────────────┘  └──────────────┘
+
+### 2. Kubernetes Orchestration Architecture (Production Target)
+In the production cluster, traffic enters via an Nginx Ingress Controller, which performs Layer 7 load balancing to route external HTTP requests to the Django Web Service. Django runs in a multi-replica configuration, connecting to a persistent MySQL database secured via Kubernetes Secrets.
+
+```mermaid
+graph TD
+    subgraph Namespace: notes-app
+        Ingress[Cluster Ingress / LoadBalancer] -->|Port 80| AppSvc[notes-app-service]
+        AppSvc -->|Load Balancer| AppPod1[App Pod: Replica 1]
+        AppSvc -->|Load Balancer| AppPod2[App Pod: Replica 2]
+        
+        AppPod1 & AppPod2 -->|Database Endpoint| MySQLService[mysql-service:3306]
+        MySQLService --> MySQLPod[MySQL Pod: Replica 1]
+        
+        MySQLPod -->|State Persistent Mount| PVC[PersistentVolumeClaim: mysql-pvc]
+        AppPod1 & AppPod2 & MySQLPod -.->|Reads Secret Envs| Secret[Secret: mysql-secret]
+    end
 ```
 
 ---
 
-## 🚀 Tech Stack
-
-| Layer            | Technology                                                     |
-| ---------------- | -------------------------------------------------------------- |
-| **Frontend**     | React (pre-built static bundle served via Django)              |
-| **Backend**      | Django REST Framework + Gunicorn WSGI                          |
-| **Database**     | MySQL 8.0 with Persistent Volume Claims                        |
-| **Reverse Proxy**| Nginx (local dev) / Kubernetes Ingress (production)            |
-| **Container**    | Docker (multi-stage, non-root user)                            |
-| **Orchestration**| Kubernetes (Kind cluster) with Namespace isolation             |
-| **CI/CD**        | Jenkins Declarative Pipeline (6-stage)                         |
-| **Registry**     | Docker Hub (`sudarshan0907/notes-app-k8s`)                     |
+## 🛠️ Infrastructure & Tech Stack
+*   **Application Core:** Django REST Framework (Backend API) & React (Frontend SPA).
+*   **Server Engine:** Gunicorn WSGI HTTP Server.
+*   **Web Server & Reverse Proxy:** Nginx (Alpine-based, serves frontend builds and proxies API requests).
+*   **Local Multi-Container Runtime:** Docker Compose.
+*   **Container Orchestration:** Kubernetes (Kind Local Cluster).
+*   **Continuous Integration Engine:** Jenkins (Declarative pipeline running in Docker).
+*   **Container Registry:** Docker Hub (`sudarshan0907/notes-app-k8s`).
 
 ---
 
-## 🔒 DevSecOps Security Hardening
+## 🔒 DevSecOps & Security Hardening
 
-### Non-Root Container Execution
-The application container runs as a dedicated non-privileged user (`appuser`, UID 10001) instead of root, significantly reducing the attack surface for container escape exploits.
+### 1. Non-Root Container Execution (CIS Benchmark)
+To mitigate container escape vulnerabilities and privilege escalation attacks, the Gunicorn/Django container runs as a dedicated non-privileged system user (`appuser`, UID 10001) instead of root.
 
 ```dockerfile
 # Security: Create non-root application user
@@ -73,117 +67,87 @@ COPY --chown=appuser:appuser . .
 USER appuser
 ```
 
-### Kubernetes Secret Management
-All database credentials (`MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_ROOT_PASSWORD`) are stored in Kubernetes Secrets and injected at runtime via `envFrom` — never hardcoded in source code or container images.
+### 2. Kubernetes Secret Management
+Database credentials (`MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_ROOT_PASSWORD`) are never hardcoded in source code or container layers. They are managed via Kubernetes Opaque Secrets (`mysql-secret.yml`) and dynamically injected into pods at runtime using `envFrom`.
 
-### `.env` Exclusion
-The `.env` file is excluded from version control via `.gitignore` and is never committed to the repository. A `.env.example` template is provided for onboarding.
-
----
-
-## ☸️ Kubernetes Manifests
-
-All manifests are in the `k8s/` directory and deploy into the `notes-app` namespace:
-
-| Manifest                  | Purpose                                                    |
-| ------------------------- | ---------------------------------------------------------- |
-| `namespace.yml`           | Creates the `notes-app` namespace for workload isolation   |
-| `mysql-secret.yml`        | Stores database credentials as Kubernetes Secrets          |
-| `mysql-pvc.yml`           | Provisions persistent storage for MySQL data               |
-| `mysql-deployment.yml`    | MySQL 8.0 with `Recreate` strategy and health probes       |
-| `mysql-service.yml`       | ClusterIP service for internal database connectivity       |
-| `deployment.yml`          | Django app (2 replicas) with liveness/readiness probes     |
-| `service.yml`             | ClusterIP service exposing Django on port 8000             |
-| `ingress.yml`             | Nginx Ingress routing external HTTP traffic to the service |
-
-### Self-Healing Infrastructure
-
-**Django Pods** — HTTP-based health probes:
-```yaml
-livenessProbe:
-  httpGet:
-    path: /api/
-    port: 8000
-  initialDelaySeconds: 15
-  periodSeconds: 10
-
-readinessProbe:
-  httpGet:
-    path: /api/
-    port: 8000
-  initialDelaySeconds: 10
-  periodSeconds: 10
-```
-
-**MySQL Pod** — Command execution probes:
-```yaml
-livenessProbe:
-  exec:
-    command: ["mysqladmin", "ping", "-h", "localhost"]
-  initialDelaySeconds: 30
-  periodSeconds: 10
-```
-
-### MySQL Recreate Strategy
-The MySQL deployment uses `strategy.type: Recreate` instead of `RollingUpdate` to prevent **Persistent Volume deadlocks** — a single-replica database with `ReadWriteOnce` PVC would crash-loop during rolling updates because both old and new pods try to lock the same data files simultaneously.
+### 3. Git Exclusions
+The `.env` file containing local credentials is fully excluded from version control via `.gitignore`. A `.env.example` file is provided as a template for onboarding developers.
 
 ---
 
-## 🔄 Jenkins CI/CD Pipeline
+## 🤖 Jenkins CI/CD Pipeline (GitOps Lifecycle)
 
-The `Jenkinsfile` defines a **6-stage declarative pipeline** with GitOps-style deployments:
+The Jenkins pipeline automates the software development lifecycle from code commit to target environment deployment.
 
+```mermaid
+flowchart LR
+    A[Clone Code] --> B[Build Image]
+    B --> C[Unit Tests]
+    C --> D[Compose Smoke Test]
+    D --> E[Push to Registry]
+    E --> F[Deploy to K8s]
 ```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│ Clone Code  │───▶│ Build Image │───▶│ Unit Tests  │
-└─────────────┘    └─────────────┘    └─────────────┘
-                                            │
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│ Deploy K8s  │◀───│ Push to Hub │◀───│Compose Test │
-└─────────────┘    └─────────────┘    └─────────────┘
-```
 
-### Pipeline Stages
+### Pipeline Stage Details
 
-| Stage                    | Description                                                         |
-| ------------------------ | ------------------------------------------------------------------- |
-| **Clone Code**           | Checks out the `main` branch from GitHub                            |
-| **Build Docker Image**   | Builds and tags with Git commit SHA (`sudarshan0907/notes-app-k8s:<sha>`) |
-| **Run Unit Tests**       | Executes Django REST API tests inside the container (SQLite in-memory) |
-| **Test & Run via Compose** | Smoke tests the full stack (Django + MySQL + Nginx) via Docker Compose |
-| **Push to Docker Hub**   | Pushes both `:<sha>` and `:latest` tags to Docker Hub               |
-| **Deploy to Kubernetes** | Loads image into Kind nodes, injects tag via `sed`, applies manifests |
+| Stage | Operations Performed | DevOps Impact |
+|---|---|---|
+| **Clone Code** | Checks out the latest commit on the `main` branch. Retrieves Git Commit SHA as the build identifier. | Dynamic tagging traceability. |
+| **Build Docker Image** | Builds the backend image locally using Docker layer caching optimization. | Fast rebuild times. |
+| **Run Unit Tests** | Executes Django API tests inside a transient container run using SQLite in-memory DB. | Early test-driven quality assurance. |
+| **Test & Run via Compose** | Starts Gunicorn + MySQL container stack using Docker Compose, performs health check, and checks container logs before tearing down the stack. | Transient integration/smoke testing. |
+| **Push to Docker Hub** | Logins, tags, and pushes the built image with both the unique Git SHA tag (`:a9840f8`) and the `:latest` tag to Docker Hub. | Immutable release tracking. |
+| **Deploy to Kubernetes** | Loads the image into Kind nodes, injects the Git tag into deployment manifests via `sed`, and applies resource manifests to rolling restart the workload. | Progressive GitOps deployment. |
 
-### Dynamic Image Tagging
-Every build is tagged with the **Git commit SHA** (`git rev-parse --short HEAD`), ensuring:
-- Full traceability from deployed pod → Docker image → exact source code commit
-- No ambiguous `:latest` tags in production
-- Easy rollback to any previous version
+---
 
-```groovy
-environment {
-    IMAGE_TAG = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-}
-```
+## ☸️ Kubernetes Infrastructure Layout (`/k8s`)
+
+The declarative manifests in `/k8s` define a self-healing, decoupled state in the cluster:
+
+| Manifest | Kubernetes Resource | Description | Configuration Details |
+|---|---|---|---|
+| `namespace.yml` | `Namespace` | Logical segregation of assets. | Namespace: `notes-app` |
+| `mysql-secret.yml` | `Secret` | Sensitive configuration data. | Opaque secret containing 4 DB credentials. |
+| `mysql-pvc.yml` | `PersistentVolumeClaim` | Permanent database block storage request. | Size: `5Gi`, AccessMode: `ReadWriteOnce`. |
+| `mysql-deployment.yml` | `Deployment` | Stateful single-replica MySQL 8.0 database. | Mounted to PVC, uses `Recreate` strategy, executes `mysqladmin ping` probes. |
+| `mysql-service.yml` | `Service` | Exposes MySQL cluster-internally. | Type: `ClusterIP`, Port: `3306`. |
+| `deployment.yml` | `Deployment` | Django application lifecycle controller. | 2 Replicas, defines CPU/Memory requests & limits, configures HTTP probes, allows wildcard host headers. |
+| `service.yml` | `Service` | Exposes Django application internally. | Type: `ClusterIP`, Port: `8000`. |
+| `ingress.yml` | `Ingress` | Decoupled entry gateway for routing external HTTP requests. | Routes `/` traffic on port 80 to `notes-app-service`. |
+
+### Self-Healing & Reliability Configs
+
+#### 1. Ingress Layer 7 Routing
+External traffic is routed to the application through `ingress.yml` which points to `notes-app-service:8000`, eliminating the need to expose NodePorts on cluster nodes.
+
+#### 2. Liveness & Readiness Probes
+Both deployments utilize automated health monitoring to enable self-healing and zero-downtime rollouts:
+*   **Application Pods:** Periodically query the HTTP `/api/` endpoint on port 8000.
+*   **MySQL Pods:** Periodically execute `mysqladmin ping -h localhost` to confirm database readiness.
+
+#### 3. MySQL PVC Deadlock Mitigation
+The database deployment uses `strategy.type: Recreate` instead of `RollingUpdate`. Because the Persistent Volume utilizes `ReadWriteOnce` access mode, a rolling update would deadlock because the new replica cannot lock the volume while the old replica is still running and holding the lock. `Recreate` terminates the old pod first, releasing the lock, and then successfully spins up the new replica.
+
+#### 4. Django Allowed Hosts Fix
+To prevent HTTP 400 Bad Request errors during internal Kubernetes readiness and liveness checks (which hit the pod on its internal IP address), the environment variable `DJANGO_ALLOWED_HOSTS: "*"` is injected into the container's runtime environment.
 
 ---
 
 ## 🧪 Automated Testing
 
-### Django REST API Unit Tests
-Located in `api/tests.py`, the test suite validates all CRUD endpoints:
+### Django REST API Unit Tests (`api/tests.py`)
+A comprehensive unit test suite is included to validate the Django REST API CRUD endpoints. The suite covers:
+*   `test_get_all_notes`: Asserts `GET /api/notes/` returns HTTP 200.
+*   `test_get_single_note`: Asserts `GET /api/notes/<id>/` retrieves correct note body.
+*   `test_create_note`: Asserts `POST /api/notes/create/` persists a new note record.
+*   `test_update_note`: Asserts `PUT /api/notes/<id>/update/` successfully modifies note content.
+*   `test_delete_note`: Asserts `DELETE /api/notes/<id>/delete/` removes the record.
+*   `test_get_api_routes`: Asserts root API documentation endpoint works.
 
-| Test Case                | Endpoint Tested          | Assertion                        |
-| ------------------------ | ------------------------ | -------------------------------- |
-| `test_get_all_notes`     | `GET /api/notes/`        | Returns HTTP 200                 |
-| `test_get_single_note`   | `GET /api/notes/<id>/`   | Returns correct note data        |
-| `test_create_note`       | `POST /api/notes/create/`| Creates note, count increments   |
-| `test_update_note`       | `PUT /api/notes/<id>/update/` | Updates title in database   |
-| `test_delete_note`       | `DELETE /api/notes/<id>/delete/` | Removes note, count = 0 |
-| `test_get_api_routes`    | `GET /api/`              | Returns API route listing        |
+### Test Isolation (In-Memory Database)
+To keep CI builds fast and independent of database infrastructure, `notesapp/settings.py` includes a fallback mechanism that automatically redirects the database engine to an **in-memory SQLite database** during testing.
 
-### Test Database Isolation
-Tests run against an **in-memory SQLite database** to eliminate MySQL dependency during CI:
 ```python
 import sys
 
@@ -198,137 +162,41 @@ if 'test' in sys.argv:
 
 ---
 
-## 📁 Project Structure
+## 🛠️ Operational Tasks (How to Run)
 
-```
-django-notes-app-k8s/
-├── api/                        # Django REST API application
-│   ├── models.py               # Note data model
-│   ├── views.py                # CRUD API views
-│   ├── serializers.py          # DRF serializers
-│   ├── urls.py                 # API URL routing
-│   └── tests.py                # Automated unit tests (6 test cases)
-│
-├── notesapp/                   # Django project configuration
-│   ├── settings.py             # Environment-driven settings + test DB fallback
-│   ├── urls.py                 # Root URL configuration
-│   └── wsgi.py                 # WSGI entry point for Gunicorn
-│
-├── mynotes/                    # React frontend (pre-built)
-│   └── build/                  # Static production bundle
-│
-├── nginx/                      # Reverse proxy configuration
-│   └── default.conf            # Nginx config for local dev
-│
-├── k8s/                        # Kubernetes manifests
-│   ├── namespace.yml           # Namespace isolation
-│   ├── mysql-secret.yml        # Database credentials (base64)
-│   ├── mysql-pvc.yml           # Persistent volume claim
-│   ├── mysql-deployment.yml    # MySQL with Recreate strategy + probes
-│   ├── mysql-service.yml       # Internal database service
-│   ├── deployment.yml          # Django app with health probes
-│   ├── service.yml             # Application ClusterIP service
-│   └── ingress.yml             # HTTP traffic routing
-│
-├── Dockerfile                  # Hardened container (non-root user)
-├── docker-compose.yml          # Local development orchestration
-├── Jenkinsfile                 # 6-stage CI/CD pipeline
-├── requirements.txt            # Python dependencies
-├── .env.example                # Environment variable template
-└── .gitignore                  # Git exclusions
-```
-
----
-
-## 🛠️ Getting Started
-
-### Prerequisites
-- Docker & Docker Compose
-- Kubernetes cluster (Kind, Minikube, or cloud)
-- Jenkins (with Docker socket access)
-- `kubectl` configured
-
-### 1️⃣ Clone the Repository
+### 1. Local Development (Docker Compose)
+To spin up Gunicorn, MySQL, and Nginx locally:
 ```bash
+# Clone the repository
 git clone https://github.com/sudarshanvashisht/django-notes-app-k8s.git
 cd django-notes-app-k8s
-```
 
-### 2️⃣ Local Development (Docker Compose)
-```bash
+# Create environment template
 cp .env.example .env
-# Edit .env with your database credentials
-docker compose up -d
-```
-Access the app at `http://localhost`
 
-### 3️⃣ Run Unit Tests
+# Run compose
+docker compose up --build -d
+```
+Access the application on your host machine at `http://localhost`.
+
+### 2. Run Local Unit Tests
+To validate code quality before pushing commits:
 ```bash
-docker build . -t notes-app-k8s:test
-docker run --rm notes-app-k8s:test python manage.py test
+# Build test image
+docker build . -t notes-app-test:local
+
+# Run tests
+docker run --rm notes-app-test:local python manage.py test
 ```
 
-### 4️⃣ Deploy to Kubernetes
+### 3. Deploy Manually to Kubernetes Cluster
+If you want to bypass Jenkins and apply configurations directly:
 ```bash
-# Create namespace and secrets
+# Apply resources
 kubectl apply -f k8s/namespace.yml
 kubectl apply -f k8s/mysql-secret.yml
-
-# Deploy the full stack
 kubectl apply -f k8s/
 
-# Verify deployment
-kubectl get pods -n notes-app
-kubectl get svc -n notes-app
+# Monitor deployment progress
+kubectl get pods -n notes-app -w
 ```
-
----
-
-## 🔑 Environment Variables
-
-| Variable                | Description                    | Default           |
-| ----------------------- | ------------------------------ | ----------------- |
-| `DJANGO_SECRET_KEY`     | Django cryptographic key       | Dev-only fallback |
-| `DJANGO_DEBUG`          | Enable/disable debug mode      | `False`           |
-| `DJANGO_ALLOWED_HOSTS`  | Comma-separated allowed hosts  | `localhost`       |
-| `MYSQL_DATABASE`        | Database name                  | `notesdb`         |
-| `MYSQL_USER`            | Database user                  | `notesuser`       |
-| `MYSQL_PASSWORD`        | Database password              | —                 |
-| `MYSQL_ROOT_PASSWORD`   | MySQL root password            | —                 |
-| `MYSQL_HOST`            | Database hostname              | `mysql`           |
-| `MYSQL_PORT`            | Database port                  | `3306`            |
-| `CORS_ALLOWED_ORIGINS`  | Frontend CORS origins          | `http://localhost` |
-| `CSRF_TRUSTED_ORIGINS`  | Trusted CSRF origins           | `http://localhost` |
-
----
-
-## 🐳 Docker Hub
-
-**Image:** [`sudarshan0907/notes-app-k8s`](https://hub.docker.com/r/sudarshan0907/notes-app-k8s)
-
-```bash
-docker pull sudarshan0907/notes-app-k8s:latest
-```
-
----
-
-## 📝 Key Engineering Decisions
-
-| Decision | Rationale |
-|---|---|
-| **Non-root Dockerfile** | Prevents container escape exploits; follows CIS Docker Benchmark |
-| **Git SHA image tags** | Full traceability from pod → image → source commit |
-| **SQLite test fallback** | Eliminates MySQL dependency in CI; tests run in < 5 seconds |
-| **MySQL Recreate strategy** | Prevents PV deadlock on single-replica database rolling updates |
-| **`DJANGO_ALLOWED_HOSTS: "*"`** | Required for K8s health probes which use internal pod IPs |
-| **`imagePullPolicy: IfNotPresent`** | Optimized for local Kind clusters using `kind load docker-image` |
-| **Ingress resource** | Layer 7 HTTP routing without NodePort exposure |
-
----
-
-## 👤 Author
-
-**Sudarshan Vashisht**
-
-- GitHub: [@sudarshanvashisht](https://github.com/sudarshanvashisht)
-- Docker Hub: [sudarshan0907](https://hub.docker.com/u/sudarshan0907)
