@@ -23,6 +23,9 @@ RUN groupadd -g 10001 appuser \
 
 COPY --chown=appuser:appuser . .
 
+# Run collectstatic so WhiteNoise can serve the React static files
+RUN python manage.py collectstatic --noinput && chown -R appuser:appuser /app/staticfiles
+
 USER appuser
 
 EXPOSE 8000
