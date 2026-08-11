@@ -84,34 +84,13 @@ spec:
             - name: mysql-storage
               mountPath: /var/lib/mysql
 
-          readinessProbe:
-            exec:
-              command:
-                - sh
-                - -c
-                - mysqladmin ping -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD"
-            initialDelaySeconds: 10
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 6
-
-          livenessProbe:
-            exec:
-              command:
-                - sh
-                - -c
-                - mysqladmin ping -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD"
-            initialDelaySeconds: 30
-            periodSeconds: 20
-            timeoutSeconds: 5
-            failureThreshold: 3
-
           startupProbe:
             exec:
               command:
-                - sh
-                - -c
-                - mysqladmin ping -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD"
+                - mysqladmin
+                - ping
+                - -h
+                - localhost
             periodSeconds: 10
             failureThreshold: 12
 

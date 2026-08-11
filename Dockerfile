@@ -18,18 +18,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
-RUN useradd --create-home --shell /bin/bash appuser
-
-# Security: Create non-root application user
 RUN groupadd -g 10001 appuser \
-    && useradd -u 10001 -g appuser -m -s /bin/bash appuser \
-    && chown -R appuser:appuser /app
+    && useradd -u 10001 -g appuser -m -s /bin/bash appuser
 
 COPY --chown=appuser:appuser . .
-
-USER appuser
-
-RUN chown -R appuser:appuser /app
 
 USER appuser
 
