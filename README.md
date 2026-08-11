@@ -13,7 +13,7 @@ Welcome to the **DevSecOps Edition** of the Django-React Notes App! This reposit
 
 ## 🌟 Key DevOps & Architecture Highlights
 
-This project showcases industry-standard infrastructure practices expected of a modern DevOps Engineer:
+This project showcases industry-standard infrastructure practices expected of a modern DevOps Engineer
 
 - 🐳 **Containerization**: Optimized Docker builds using `python:3.12-slim`, with WhiteNoise serving static React builds.
 - ☸️ **Orchestration**: Full Kubernetes deployment utilizing **Kustomize** for configuration management.
