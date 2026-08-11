@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: notes-app
+
+resources:
+  - namespace.yml
+  - configmap.yml
+  - mysql-secret.yml
+  - mysql-pvc.yml
+  - mysql-service.yml
+  - mysql-deployment.yml
+  - service.yml
+  - deployment.yml
+
+images:
+  - name: sudarshan0907/notes-app-k8s
+    newTag: latest

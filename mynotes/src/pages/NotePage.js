@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { useParams,useNavigate,Link } from 'react-router-dom'
-// import notes from '../assets/data.js'
+import { useNavigate, useParams } from 'react-router-dom'
 import { ReactComponent as ArrowLeft } from '../assets/arrow-left.svg'
 
 const NotePage = () => {
@@ -12,7 +11,6 @@ const NotePage = () => {
       if (id === 'new') return
       let response = await fetch(`/api/notes/${id}`)
       let data = await response.json()
-      console.log(data)
       setNote(data)
     }
     getNote()
@@ -24,7 +22,7 @@ const NotePage = () => {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({...note, 'updated': new Date()})
+      body: JSON.stringify({body: note.body || ""})
     })
   }
 
@@ -34,7 +32,7 @@ const NotePage = () => {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({...note, 'updated': new Date()})
+      body: JSON.stringify({body: note.body || ""})
     })
   }
 
@@ -45,13 +43,13 @@ const NotePage = () => {
     navigate('/')
   }
 
-  let handleSubmit = () => {
-    if (id !== 'new' && !note.body) {
-      deleteNote()
+  let handleSubmit = async () => {
+    if (id !== 'new' && !note.body?.trim()) {
+      await deleteNote()
     } else if (id !== 'new') {
-      updateNote()
-    } else if (id ==='new' && note !== null) {
-      createNote()
+      await updateNote()
+    } else if (id === 'new' && note.body?.trim()) {
+      await createNote()
     }
     navigate('/')
   }
@@ -60,19 +58,22 @@ const NotePage = () => {
     <div className='note'>
       <div className="note-header">
         <h3>
-          <Link to='/'>
-            <ArrowLeft onClick={handleSubmit} />
-          </Link>
+          <button type="button" onClick={handleSubmit} aria-label="Go back">
+            <ArrowLeft />
+          </button>
         </h3>
         {id !== 'new' ? (
-          <button onClick={deleteNote}>Delete</button>
+          <button type="button" onClick={deleteNote}>Delete</button>
         ):(
-          <button onClick={handleSubmit}>Save</button>
+          <button type="button" onClick={handleSubmit}>Save</button>
         )}
       </div>
       <div className="note-body">
-        <textarea onChange={(e) => {setNote({...note, 'body':e.target.value})}} value={note.body}>  
-        </textarea>
+        <textarea
+          onChange={(e) => {setNote({...note, 'body':e.target.value})}}
+          value={note.body || ""}
+          placeholder="Write a note..."
+        />
       </div>
     </div>
   )

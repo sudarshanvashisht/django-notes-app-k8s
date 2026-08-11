@@ -10,11 +10,15 @@ RUN apt-get update \
         default-libmysqlclient-dev \
         build-essential \
         pkg-config \
+        curl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
+
+RUN useradd --create-home --shell /bin/bash appuser
 
 # Security: Create non-root application user
 RUN groupadd -g 10001 appuser \
@@ -25,6 +29,10 @@ COPY --chown=appuser:appuser . .
 
 USER appuser
 
+RUN chown -R appuser:appuser /app
+
+USER appuser
+
 EXPOSE 8000
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "notesapp.wsgi:application"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "60", "--access-logfile", "-", "--error-logfile", "-", "notesapp.wsgi:application"]

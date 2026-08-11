@@ -1,78 +1,113 @@
-from django.shortcuts import render
+from django.db import DatabaseError, connection
+from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view
+from rest_framework import status
 from rest_framework.response import Response
-from .serializers import NoteSerializer
+
 from .models import Note
+from .serializers import NoteSerializer
 
-# Create your views here.
-
-@api_view(['GET'])
+@api_view(["GET"])
 def getRoutes(request):
     routes = [
         {
-            'Endpoint': '/notes/',
-            'method': 'GET',
-            'body': None,
-            'description': 'Returns an array of notes'
+            "Endpoint": "/api/notes/",
+            "method": "GET",
+            "body": None,
+            "description": "Returns an array of notes",
         },
         {
-            'Endpoint': '/notes/id',
-            'method': 'GET',
-            'body': None,
-            'description': 'Returns a single note object'
+            "Endpoint": "/api/notes/<id>/",
+            "method": "GET",
+            "body": None,
+            "description": "Returns a single note object",
         },
         {
-            'Endpoint': '/notes/create/',
-            'method': 'POST',
-            'body': {'body': ""},
-            'description': 'Creates new note with data sent in post request'
+            "Endpoint": "/api/notes/create/",
+            "method": "POST",
+            "body": {"body": ""},
+            "description": "Creates a note from request data",
         },
         {
-            'Endpoint': '/notes/id/update/',
-            'method': 'PUT',
-            'body': {'body': ""},
-            'description': 'Creates an existing note with data sent in post request'
+            "Endpoint": "/api/notes/<id>/update/",
+            "method": "PUT",
+            "body": {"body": ""},
+            "description": "Updates an existing note",
         },
         {
-            'Endpoint': '/notes/id/delete/',
-            'method': 'DELETE',
-            'body': None,
-            'description': 'Deletes and exiting note'
+            "Endpoint": "/api/notes/<id>/delete/",
+            "method": "DELETE",
+            "body": None,
+            "description": "Deletes an existing note",
+        },
+        {
+            "Endpoint": "/api/healthz/",
+            "method": "GET",
+            "body": None,
+            "description": "Liveness probe for Kubernetes",
+        },
+        {
+            "Endpoint": "/api/readyz/",
+            "method": "GET",
+            "body": None,
+            "description": "Readiness probe that checks database access",
         },
     ]
     return Response(routes)
 
-@api_view(['GET'])
+
+@api_view(["GET"])
+def healthz(request):
+    return Response({"status": "ok"}, status=status.HTTP_200_OK)
+
+
+@api_view(["GET"])
+def readyz(request):
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+    except DatabaseError:
+        return Response(
+            {"status": "unavailable"},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    return Response({"status": "ready"}, status=status.HTTP_200_OK)
+
+
+@api_view(["GET"])
 def getNotes(request):
     notes = Note.objects.all().order_by('-created')
     serializer = NoteSerializer(notes, many=True)
     return Response(serializer.data)
 
-@api_view(['GET'])
+
+@api_view(["GET"])
 def getNote(request, pk):
-    note = Note.objects.get(id=pk)
+    note = get_object_or_404(Note, id=pk)
     serializer = NoteSerializer(note, many=False)
     return Response(serializer.data)
 
-@api_view(['PUT'])
+
+@api_view(["PUT"])
 def updateNote(request, pk):
-    note = Note.objects.get(id=pk)
+    note = get_object_or_404(Note, id=pk)
     serializer = NoteSerializer(instance=note, data=request.data)
-    if serializer.is_valid():
-        serializer.save()
-    return Response(serializer.data)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data, status=status.HTTP_200_OK)
 
-@api_view(['DELETE'])
+
+@api_view(["DELETE"])
 def deleteNote(request, pk):
-    note = Note.objects.get(id=pk)
+    note = get_object_or_404(Note, id=pk)
     note.delete()
-    return Response('Note was deleted!')
+    return Response(status=status.HTTP_204_NO_CONTENT)
 
-@api_view(['POST'])
+
+@api_view(["POST"])
 def createNote(request):
-    data = request.data
-    note = Note.objects.create(
-        body=data['body']
-    )
-    serializer = NoteSerializer(note, many=False)
-    return Response(serializer.data)
+    serializer = NoteSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data, status=status.HTTP_201_CREATED)

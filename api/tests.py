@@ -1,45 +1,40 @@
-from django.test import TestCase
-from rest_framework.test import APIClient
+from django.urls import reverse
 from rest_framework import status
-from .models import Note
+from rest_framework.test import APITestCase
 
 
-class NoteAPITestCase(TestCase):
-    """Functional tests for the Notes REST API endpoints."""
+class NoteApiTests(APITestCase):
+    def test_health_endpoints(self):
+        self.assertEqual(self.client.get(reverse("healthz")).status_code, status.HTTP_200_OK)
+        self.assertEqual(self.client.get(reverse("readyz")).status_code, status.HTTP_200_OK)
 
-    def setUp(self):
-        self.client = APIClient()
-        self.note_data = {"body": "This is a test note body."}
-        self.note = Note.objects.create(body="Existing note body.")
-
-    def test_get_all_notes(self):
-        response = self.client.get("/api/notes/")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-    def test_get_single_note(self):
-        response = self.client.get(f"/api/notes/{self.note.id}/")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["body"], "Existing note body.")
-
-    def test_create_note(self):
-        response = self.client.post("/api/notes/create/", self.note_data, format="json")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(Note.objects.count(), 2)
-
-    def test_update_note(self):
-        updated = {"body": "Updated body content."}
-        response = self.client.put(
-            f"/api/notes/{self.note.id}/update/", updated, format="json"
+    def test_crud_flow(self):
+        create_response = self.client.post(
+            reverse("create-note"),
+            {"body": "First note"},
+            format="json",
         )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.note.refresh_from_db()
-        self.assertEqual(self.note.body, "Updated body content.")
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(create_response.data["body"], "First note")
 
-    def test_delete_note(self):
-        response = self.client.delete(f"/api/notes/{self.note.id}/delete/")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(Note.objects.count(), 0)
+        note_id = create_response.data["id"]
 
-    def test_get_api_routes(self):
-        response = self.client.get("/api/")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        list_response = self.client.get(reverse("notes"))
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(list_response.data), 1)
+
+        detail_response = self.client.get(reverse("note", args=[note_id]))
+        self.assertEqual(detail_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(detail_response.data["body"], "First note")
+
+        update_response = self.client.put(
+            reverse("update-note", args=[note_id]),
+            {"body": "Updated note"},
+            format="json",
+        )
+        self.assertEqual(update_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(update_response.data["body"], "Updated note")
+
+        delete_response = self.client.delete(reverse("delete-note", args=[note_id]))
+        self.assertEqual(delete_response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(self.client.get(reverse("notes")).data, [])

@@ -8,6 +8,11 @@ metadata:
 
 spec:
   replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
 
   selector:
     matchLabels:
@@ -19,45 +24,74 @@ spec:
         app: notes-app
 
     spec:
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        fsGroup: 1000
+      initContainers:
+        - name: migrate
+          image: sudarshan0907/notes-app-k8s:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - python manage.py migrate --noinput
+          envFrom:
+            - configMapRef:
+                name: notes-app-config
+            - secretRef:
+                name: mysql-secret
       containers:
         - name: notes-app
-          image: sudarshan0907/notes-app-k8s:__IMAGE_TAG__
+          image: sudarshan0907/notes-app-k8s:latest
           imagePullPolicy: IfNotPresent
 
           ports:
-            - containerPort: 8000
-
-          livenessProbe:
-            httpGet:
-              path: /api/
-              port: 8000
-            initialDelaySeconds: 15
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 3
-
-          readinessProbe:
-            httpGet:
-              path: /api/
-              port: 8000
-            initialDelaySeconds: 10
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 3
+            - name: http
+              containerPort: 8000
 
           envFrom:
+            - configMapRef:
+                name: notes-app-config
             - secretRef:
                 name: mysql-secret
 
-          env:
-            - name: MYSQL_HOST
-              value: mysql
+          command:
+            - gunicorn
+            - --bind
+            - 0.0.0.0:8000
+            - --workers
+            - "3"
+            - --timeout
+            - "60"
+            - --access-logfile
+            - "-"
+            - --error-logfile
+            - "-"
+            - notesapp.wsgi:application
 
-            - name: MYSQL_PORT
-              value: "3306"
+          readinessProbe:
+            httpGet:
+              path: /api/readyz/
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
 
-            - name: DJANGO_ALLOWED_HOSTS
-              value: "*"
+          livenessProbe:
+            httpGet:
+              path: /api/healthz/
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            runAsUser: 1000
 
           resources:
             requests:
