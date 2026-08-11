@@ -12,6 +12,7 @@ resources:
   - mysql-deployment.yml
   - service.yml
   - deployment.yml
+  - ingress.yml
 
 images:
   - name: sudarshan0907/notes-app-k8s

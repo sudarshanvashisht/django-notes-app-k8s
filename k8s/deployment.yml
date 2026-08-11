@@ -26,7 +26,7 @@ spec:
     spec:
       terminationGracePeriodSeconds: 30
       securityContext:
-        fsGroup: 1000
+        fsGroup: 10001
       initContainers:
         - name: migrate
           image: sudarshan0907/notes-app-k8s:latest
@@ -91,7 +91,7 @@ spec:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: false
             runAsNonRoot: true
-            runAsUser: 1000
+            runAsUser: 10001
 
           resources:
             requests:

@@ -7,6 +7,5 @@ __pycache__
 .mypy_cache
 node_modules
 mynotes/node_modules
-mynotes/build/static/**/*.map
-staticfiles/**/*.map
+
 .DS_Store
