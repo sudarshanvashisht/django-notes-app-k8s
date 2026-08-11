@@ -16,7 +16,14 @@ COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# Security: Create non-root application user
+RUN groupadd -g 10001 appuser \
+    && useradd -u 10001 -g appuser -m -s /bin/bash appuser \
+    && chown -R appuser:appuser /app
+
+COPY --chown=appuser:appuser . .
+
+USER appuser
 
 EXPOSE 8000
 

@@ -21,11 +21,29 @@ spec:
     spec:
       containers:
         - name: notes-app
-          image: sudarshan0907/notes-app-k8s:latest
-          imagePullPolicy: Always
+          image: sudarshan0907/notes-app-k8s:__IMAGE_TAG__
+          imagePullPolicy: IfNotPresent
 
           ports:
             - containerPort: 8000
+
+          livenessProbe:
+            httpGet:
+              path: /api/
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /api/
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
 
           envFrom:
             - secretRef:
@@ -37,6 +55,9 @@ spec:
 
             - name: MYSQL_PORT
               value: "3306"
+
+            - name: DJANGO_ALLOWED_HOSTS
+              value: "*"
 
           resources:
             requests:
