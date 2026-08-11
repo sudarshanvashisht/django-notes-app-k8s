@@ -1,27 +1,22 @@
 # Django Notes App K8s
 
-This repository is a DevOps-focused full-stack project built to demonstrate the complete delivery path for a small production-style application:
+This repository contains a full-stack notes application packaged as a DevOps portfolio project. The codebase demonstrates the path from application source to container image, local orchestration, Kubernetes deployment, and automated validation.
+
+## Project Overview
+
+The implementation covers the core delivery layers expected in a practical DevOps workflow:
 
 - application code
 - containerization
 - local orchestration
 - Kubernetes deployment
-- CI/CD automation
-- health checks and release hygiene
-- test coverage across backend, frontend, image build, and manifests
+- continuous integration
+- release validation
+- basic hardening and health checks
 
-The project is intentionally scoped to be realistic for a fresher portfolio while still showing the pieces a DevOps engineer is expected to understand and explain.
+The scope is intentionally compact, which keeps the project realistic for a fresher while still showing production-minded engineering choices.
 
-## What This Project Proves
-
-- You can take a Django + React application and package it cleanly.
-- You understand how to separate app config, secrets, and infrastructure config.
-- You can define repeatable build and test steps.
-- You can deploy through Docker Compose and Kubernetes.
-- You can add health checks, resource limits, and migration handling.
-- You can explain the path from local development to a CI/CD pipeline.
-
-## High-Level Architecture
+## System Architecture
 
 ```mermaid
 flowchart LR
@@ -32,63 +27,61 @@ flowchart LR
 
     subgraph CI_CD[CI/CD Flow]
         Git[Git push] --> Jenkins[Jenkins Pipeline]
-        Jenkins --> Tests[Backend + Frontend Tests]
+        Jenkins --> Tests[Backend and Frontend Tests]
         Tests --> Image[Docker Build]
         Image --> Render[Kubernetes Render]
-        Render --> Deploy[Docker Hub / K8s]
+        Render --> Deploy[Docker Hub and Kubernetes]
     end
 ```
 
-## Runtime Topology
-
-### Local Compose
+### Local Compose Topology
 
 ```mermaid
 flowchart LR
-    User[Developer] --> Nginx80[Nginx :80]
-    Nginx80 --> Web[Django/Gunicorn :8000]
-    Web --> DB[(MySQL :3306)]
-    Nginx80 --> ReactFiles[React static assets]
+    User[Developer] --> Nginx80[Nginx on Port 80]
+    Nginx80 --> Web[Django and Gunicorn on Port 8000]
+    Web --> DB[(MySQL on Port 3306)]
+    Nginx80 --> ReactFiles[React Static Assets]
 ```
 
-### Kubernetes
+### Kubernetes Topology
 
 ```mermaid
 flowchart LR
-    Ingress[Ingress / Load Balancer] --> AppSvc[notes-app-service]
+    Ingress[Ingress or Load Balancer] --> AppSvc[notes-app-service]
     AppSvc --> AppPod1[notes-app pod]
     AppSvc --> AppPod2[notes-app pod]
     AppPod1 --> MySQLSvc[mysql service]
     AppPod2 --> MySQLSvc
-    MySQLSvc --> MySQLPod[(mysql pod + PVC)]
+    MySQLSvc --> MySQLPod[(mysql pod with PVC)]
 ```
 
-## Repository Layout
+## Repository Structure
 
 | Path | Purpose |
 | --- | --- |
-| `api/` | Django REST API for notes CRUD |
+| `api/` | Django REST API for note management |
 | `notesapp/` | Django project settings and URL routing |
 | `mynotes/` | React frontend source and build output |
 | `k8s/` | Kubernetes manifests and kustomize entrypoint |
-| `Dockerfile` | Runtime image for Django + Gunicorn |
+| `Dockerfile` | Runtime image for Django and Gunicorn |
 | `docker-compose.yml` | Local multi-container stack |
 | `Jenkinsfile` | CI/CD pipeline definition |
-| `.github/workflows/ci.yml` | GitHub Actions CI workflow |
-| `Makefile` | Local shortcuts for checks and rendering |
+| `.github/workflows/ci.yml` | GitHub Actions workflow |
+| `Makefile` | Local shortcuts for validation and rendering |
 
-## Architecture Breakdown
+## Application Layer
 
-### Django backend
+### Django Backend
 
-The backend provides:
+The backend exposes:
 
 - CRUD endpoints for notes
 - `/api/healthz/` for liveness checks
 - `/api/readyz/` for readiness checks
-- a public routes endpoint for quick discovery
+- a route discovery endpoint under `/api/`
 
-The backend is configured with environment-driven settings:
+The backend is configured entirely through environment variables:
 
 - `DJANGO_SECRET_KEY`
 - `DJANGO_DEBUG`
@@ -103,76 +96,74 @@ The backend is configured with environment-driven settings:
 - `CORS_ALLOWED_ORIGINS`
 - `CSRF_TRUSTED_ORIGINS`
 
-### React frontend
+### React Frontend
 
-The frontend is a simple notes UI built with React Router and bundled into `mynotes/build`.
+The frontend is a lightweight React application compiled into `mynotes/build` and served by the Django runtime. The focus is not on a complex UI system. The focus is on a clean delivery pipeline and a maintainable deployment flow.
 
-Key points:
+### Data Storage
 
-- the UI is served as part of the Django runtime via WhiteNoise and template integration
-- the app is kept intentionally lightweight so the focus stays on delivery and operations
-- tests cover the shell rendering path
+MySQL is used as the persistent datastore. In Kubernetes the database is paired with a PersistentVolumeClaim so state survives pod recreation. In local Compose, the database is backed by a named Docker volume.
 
-### Docker
+## Container Layer
 
-The Docker image is designed for repeatable deployment:
+The runtime image is designed to be repeatable and conservative:
 
 - base image: `python:3.12-slim`
-- installs only the runtime and build dependencies needed for MySQL support
-- runs as a non-root user
-- executes Gunicorn as the production process
-- uses `.dockerignore` to keep the build context small
+- non-root application user
+- Gunicorn as the production process
+- MySQL client libraries installed for the backend database driver
+- `.dockerignore` to keep the build context small
 
-### Kubernetes
-
-The Kubernetes layer includes:
-
-- Namespace isolation
-- ConfigMap for non-secret app config
-- Secret for database credentials
-- Deployment for the app
-- Deployment for MySQL
-- Services for app and database
-- PVC for database persistence
-- liveness and readiness probes
-- init migration step for the app
-- resource requests and limits
-- kustomize entrypoint for consistent application
-
-The default image reference is:
+The image reference used by the deployment is:
 
 ```text
 sudarshan0907/notes-app-k8s:latest
 ```
 
-## CI/CD Design
+## Kubernetes Layer
 
-The pipeline is intentionally simple enough to explain in an interview but complete enough to show real DevOps thinking.
+The Kubernetes manifests implement the following:
 
-### Jenkins pipeline stages
+- namespace isolation
+- ConfigMap for non-secret runtime configuration
+- Secret for database credentials
+- app Deployment
+- MySQL Deployment
+- ClusterIP Services for internal traffic
+- PersistentVolumeClaim for MySQL storage
+- liveness and readiness probes
+- init migration step for the app pod
+- resource requests and limits
+- kustomize as the deployment entrypoint
 
-| Stage | What it does | Why it matters |
-| --- | --- | --- |
-| Checkout | Pulls the repository | Ensures the pipeline runs against the exact source revision |
-| Backend checks | Runs Django check and tests | Catches application and configuration errors early |
-| Frontend checks | Runs React tests and build | Verifies the UI is buildable and render-safe |
-| Docker build | Builds the runtime image | Proves the app is container-ready |
-| Push image | Pushes to Docker Hub on `main` | Publishes a release artifact |
-| Kubernetes render | Renders manifests with kustomize | Validates deployment YAML before applying it |
+## CI/CD Layer
+
+The pipeline is intentionally straightforward and explainable in an interview.
+
+### Jenkins Pipeline
+
+| Stage | Purpose |
+| --- | --- |
+| Checkout | Pulls the exact source revision |
+| Backend checks | Runs Django checks and API tests |
+| Frontend checks | Runs React tests and production build |
+| Docker build | Produces the runtime container image |
+| Push image | Publishes the image to Docker Hub on `main` |
+| Kubernetes render | Validates the Kubernetes manifests with kustomize |
 
 ### GitHub Actions
 
-The GitHub Actions workflow mirrors the same quality gates:
+The GitHub Actions workflow mirrors the same validation path:
 
 - backend validation
 - frontend validation
 - Docker build
 - Kubernetes render
 
-That gives you two pipeline surfaces to talk about:
+This gives the project two pipeline surfaces:
 
-- Jenkins for the classic DevOps/CD story
-- GitHub Actions for repo-native continuous integration
+- Jenkins for classic CI/CD delivery
+- GitHub Actions for repository-native continuous integration
 
 ## Local Development
 
@@ -182,13 +173,13 @@ Create a local environment file:
 cp .env.example .env
 ```
 
-Start the full stack:
+Start the stack:
 
 ```bash
 docker compose up --build
 ```
 
-The app is exposed through the Nginx container on:
+The application is exposed through Nginx at:
 
 ```text
 http://localhost
@@ -236,14 +227,29 @@ docker compose down
 
 ## Security and Hardening
 
-This project is not pretending to be an enterprise platform, but it does include several practical hardening steps:
+The project includes practical hardening choices that are appropriate for a portfolio-grade DevOps system:
 
-- non-root container user
+- non-root container execution
 - health and readiness endpoints
-- ConfigMap and Secret separation
+- separation of config and secrets
 - resource limits on app and database pods
-- safe defaults for debug and host configuration
-- database migration as an init step rather than a manual afterthought
-- `.dockerignore` to reduce accidental context leakage
+- safe defaults for debug and host settings
+- automatic migration handling during startup
+- `.dockerignore` for smaller build contexts
 
-#of the project story, so keep that repository name consistent if you retag releases.
+## Current Scope
+
+The project is intentionally not enterprise-complete. The remaining gaps are clear and easy to explain:
+
+- no external secret manager
+- no image scanning gate
+- no dependency scanning gate
+- no observability stack
+- no HPA or network policies
+- no application-level authentication
+
+That scope is appropriate for a fresher project because it keeps the focus on delivery fundamentals, not on unnecessary platform complexity.
+
+## Project Attribution
+
+Maintainer: `sudarshanvashisht`
