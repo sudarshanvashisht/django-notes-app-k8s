@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notes-app-deployment
+  namespace: notes-app
+  labels:
+    app: notes-app
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: notes-app
+
+  template:
+    metadata:
+      labels:
+        app: notes-app
+
+    spec:
+      containers:
+        - name: notes-app
+          image: sudarshan0907/notes-app-k8s:latest
+          imagePullPolicy: Always
+
+          ports:
+            - containerPort: 8000
+
+          envFrom:
+            - secretRef:
+                name: mysql-secret
+
+          env:
+            - name: MYSQL_HOST
+              value: mysql
+
+            - name: MYSQL_PORT
+              value: "3306"
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+
+            limits:
+              cpu: "500m"
+              memory: "512Mi"

@@ -1,0 +1,45 @@
+services:
+
+  web:
+    build: .
+    container_name: notes-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    expose:
+      - "8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:8.0
+    container_name: notes-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 5s
+      retries: 10
+
+  nginx:
+    image: nginx:alpine
+    container_name: notes-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./mynotes/build:/usr/share/nginx/html/build:ro
+      - ./mynotes/build/static:/usr/share/nginx/html/static:ro
+    depends_on:
+      - web
+
+volumes:
+  mysql_data:
