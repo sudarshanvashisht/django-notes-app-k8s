@@ -56,12 +56,6 @@ spec:
                   name: mysql-secret
                   key: MYSQL_ROOT_PASSWORD
 
-            - name: MYSQL_PWD
-              valueFrom:
-                secretKeyRef:
-                  name: mysql-secret
-                  key: MYSQL_ROOT_PASSWORD
-
           livenessProbe:
             exec:
               command:
