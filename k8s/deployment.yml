@@ -30,7 +30,7 @@ spec:
       initContainers:
         - name: migrate
           image: sudarshan0907/notes-app-k8s:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Never
           command:
             - sh
             - -c
@@ -43,7 +43,7 @@ spec:
       containers:
         - name: notes-app
           image: sudarshan0907/notes-app-k8s:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Never
 
           ports:
             - name: http

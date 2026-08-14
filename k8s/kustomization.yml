@@ -16,4 +16,5 @@ resources:
 
 images:
   - name: sudarshan0907/notes-app-k8s
+    newName: notes-app-k8s
     newTag: latest
