@@ -45,7 +45,7 @@ pipeline {
 
         stage("Push image") {
             when {
-                branch "main"
+                 expression { env.GIT_BRANCH == 'origin/main' || env.GIT_BRANCH == 'main' }
             }
             steps {
                 withCredentials([usernamePassword(credentialsId: "dockerHub", passwordVariable: "DOCKER_PASSWORD", usernameVariable: "DOCKER_USERNAME")]) {
